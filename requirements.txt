@@ -14,3 +14,4 @@ mcp
 langgraph-checkpoint
 langgraph-checkpoint-sqlite
 langchain-community
+flask

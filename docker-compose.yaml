@@ -30,6 +30,17 @@ services:
       - "8002:8002"
     networks:
       - agent-network
+  
+  ui:
+    build:
+      context: .
+      dockerfile: UI.Dockerfile
+    ports:
+      - "8080:8080"
+    networks:
+      - agent-network
+    depends_on:
+      - main-ag
 
 networks:
   agent-network:

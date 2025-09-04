@@ -11,6 +11,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import tool
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
@@ -19,6 +20,14 @@ REP_AG_URL = os.getenv("REP_AG_URL")
 
 app = FastAPI(
     title="Main Agent"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080", "http://localhost"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

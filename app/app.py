@@ -149,17 +149,27 @@ def index():
                 
                 const url = `/proxy_run_agent?model=${model}&user_query=${encoded_query}&session_id=${session_id}`;
                 
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 360000); // 6 minutes in milliseconds
+                
                 try {
                     const res = await fetch(url, {
-                        method: 'POST'
+                        method: 'POST',
+                        signal: controller.signal
                     });
+                    clearTimeout(timeoutId);
                     if (!res.ok) {
                         throw new Error(`HTTP error! status: ${res.status}`);
                     }
                     const data = await res.text();
                     appendMessage('Agent: ' + data, 'agent');
                 } catch (error) {
-                    appendMessage('Error: ' + error.message, 'error');
+                    clearTimeout(timeoutId);
+                    if (error.name === 'AbortError') {
+                        appendMessage('Error: Request timed out after 6 minutes', 'error');
+                    } else {
+                        appendMessage('Error: ' + error.message, 'error');
+                    }
                 } finally {
                     submitButton.disabled = false;
                     submitButton.textContent = 'Send';
@@ -183,7 +193,7 @@ def proxy_run_agent():
     # Forward the query params to the internal API URL
     api_url = f"http://main-ag:8000/run_agent?{request.query_string.decode()}"
     try:
-        response = requests.post(api_url, timeout=420)
+        response = requests.post(api_url)
         return response.text, response.status_code
     except Exception as e:
         return f"Proxy error: {str(e)}", 500

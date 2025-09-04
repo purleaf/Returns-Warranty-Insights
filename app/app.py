@@ -183,7 +183,7 @@ def proxy_run_agent():
     # Forward the query params to the internal API URL
     api_url = f"http://main-ag:8000/run_agent?{request.query_string.decode()}"
     try:
-        response = requests.post(api_url)
+        response = requests.post(api_url, timeout=420)
         return response.text, response.status_code
     except Exception as e:
         return f"Proxy error: {str(e)}", 500

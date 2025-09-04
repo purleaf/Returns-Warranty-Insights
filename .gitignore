@@ -1,0 +1,9 @@
+.idea/
+__pycache__/
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+app/.env
+*.ipynb
+*.docx

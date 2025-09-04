@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+langchain-openai
+langgraph
+langchain-mcp-adapters
+aiosqlite
+python-dotenv
+langchain
+pydantic
+pandas
+chromadb
+openpyxl
+mcp
+langgraph-checkpoint
+langgraph-checkpoint-sqlite
+langchain-community

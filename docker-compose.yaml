@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  main-ag:
+    build:
+      context: .
+      dockerfile: MainAg.Dockerfile
+    ports:
+      - "8000:8000"
+    networks:
+      - agent-network
+    environment:
+      - RAG_AG_URL=http://rag-ag:8001
+      - REP_AG_URL=http://rep-ag:8002
+
+  rag-ag:
+    build:
+      context: .
+      dockerfile: RagAg.Dockerfile
+    ports:
+      - "8001:8001"
+    networks:
+      - agent-network
+
+  rep-ag:
+    build:
+      context: .
+      dockerfile: RepAg.Dockerfile
+    ports:
+      - "8002:8002"
+    networks:
+      - agent-network
+
+networks:
+  agent-network:
+    driver: bridge

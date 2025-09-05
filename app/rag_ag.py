@@ -95,8 +95,22 @@ async def return_all_data() -> str:
         cursor = await conn.cursor()
         cursor = await conn.execute("SELECT * FROM return_orders")    
         rows = await cursor.fetchall()
-        result = "\n".join([f"Order ID: {row[0]}, Product: {row[1]}, Category: {row[2]}, Return Reason: {row[3]}, Cost: {row[4]}, Approved: {row[5]}, Store: {row[6]}, Date: {row[7]}" for row in rows])
-        return result if result else "No return orders found."
+        if not rows:
+            return "No return orders found."
+
+        blocks = []
+        for row in rows:
+            blocks.append("\n".join([
+                f"order_id: {row[0]}",
+                f"product: {row[1]}",
+                f"category: {row[2]}",
+                f"return_reason: {row[3]}",
+                f"cost: {row[4]}",
+                f"approved_flag: {row[5]}",
+                f"store_name: {row[6]}",
+                f"date: {row[7]}",
+            ]))
+        return "\n\n".join(blocks)
 
 #Creating the agent tool to insert new return order into the db
 @tool
@@ -141,11 +155,11 @@ async def run_rag_ag(query: str = "", session_id: str = "default_session") -> st
 
     #Now initializing connection with db, that will be used to store checkpoints to keep conversation memory
 
-    async_conn = await aiosqlite.connect("checkpoints_rag_ag.db")
+    async_conn = await aiosqlite.connect("checkpoints_agent.db")
     checkpointer = AsyncSqliteSaver(async_conn)
 
     #Now initializing LLM model that will be used for our agent
-    llm = ChatOpenAI(model="gpt-4.1", temperature=0)
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
 
     system_message = """
     You are a retrieval agent for managing customer return orders. 

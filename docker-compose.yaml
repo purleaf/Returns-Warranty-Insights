@@ -30,6 +30,11 @@ services:
       - "8002:8002"
     networks:
       - agent-network
+    environment:
+      - REPORTS_DIR=/app/reports
+      - PUBLIC_BASE_URL=http://localhost:8002
+    volumes:
+      - reports_data:/app/reports
   
   ui:
     build:
@@ -45,3 +50,6 @@ services:
 networks:
   agent-network:
     driver: bridge
+
+volumes:
+  reports_data:

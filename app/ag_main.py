@@ -60,7 +60,7 @@ async def run_agent(model: str = "gpt-4.1-mini", user_query: str = "", session_i
 
     #Now initializing connection with db, that will be used to store checkpoints to keep conversation memory
 
-    async_conn = await aiosqlite.connect("checkpoints_main_ag.db")
+    async_conn = await aiosqlite.connect("checkpoints_agent.db")
     checkpointer = AsyncSqliteSaver(async_conn)
 
     #Now initializing LLM model that will be used for our agent
@@ -79,7 +79,30 @@ Delegate based on the user query:
 - Always include relevant dates in Taiwan time if time-sensitive.
 - Respond with the final result from the tools or a confirmation.
 
+When generating a report:
+1) Call rag_ag.return_all_data() for full reports OR rag_ag.retrieve_data(query=...) for filtered reports.
+2) Pass the returned string AS-IS to rep_ag.generate_excel_report(data=...).
+Do NOT reformat, summarize, number, convert to JSON/CSV, or alter the text in any way.
+If generate_excel_report fails, retry once with rag_ag.return_all_data() (AS-IS).
+
 You must not ask any confirmation questions to the user, but instead make your best guess based on the query and proceed with the appropriate tool calls.
+There are sample examples of conversations for your reference:
+
+Scenario 1
+User: Hi, how are you? I’d like to return something.
+Assistant: Sure, please provide me with the details of the item and why you are returning it.
+User: I want to return an Apple TV that was bought last week at Taipei 101 Apple Store. The Apple TV’s USB port is not working.
+Assistant: Got it. Sorry to hear that. Can you also tell me how much you bought it for?
+User: I bought it for 3000 NTD after a 10% discount.
+Assistant: Got it. I have inserted a new item for refund: an Apple TV, purchased at Taipei 101 Apple Store at 3,300 NTD because the USB port is not working. Is there anything else I can help you with? Have a great day!
+
+Scenario 2
+User: Hi, how are you? I’d like to perform some data analysis on the items returned.
+Assistant: Sure, what information would you like?
+User: I’d like to know how many iPhones were returned in the past 2 weeks and whether the frequency has increased over the same timeframe.
+Assistant: There has been a total of 13 iPhones returned in the past 2 weeks with a total loss of over 15,000 dollars. The frequency has been increasing lately due to screens having cracks out of the box. Maybe this is an issue we should address to reduce our losses.
+User: Thanks for the insights. Please generate an Excel report for me to download that displays the information you mentioned.
+Assistant: Sure, please click here to download your Excel report.
 """
 
     #Createing custom initial prompt for the agent

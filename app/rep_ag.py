@@ -6,17 +6,98 @@ from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langchain_openai import ChatOpenAI
+from typing import Any, Dict, List
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import tool
 import pandas
 from datetime import datetime
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from mcp.server.fastmcp import FastMCP
+from fastapi.staticfiles import StaticFiles
+import uuid
+from pathlib import Path
+import re
 
 mcp = FastMCP()
 
-
 load_dotenv()
+
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+REPORTS_DIR = Path(os.getenv("REPORTS_DIR", "./reports")).resolve()
+REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+#Here i created a function to coerce the OpenAI message content into the plain text
+def _to_text(content: Any) -> str:
+    """Coerce LC message content (str | list[dict|str] | other) to plain text."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and "text" in item and isinstance(item["text"], str):
+                parts.append(item["text"])
+            elif isinstance(item, str):
+                parts.append(item)
+        return "\n".join(parts)
+    return str(content)
+
+#This is a function to normalize the keys from the user input to match our model fields
+def _norm_key(k: str) -> str:
+    k = k.strip()
+    # common mappings to snake_case
+    k = k.lower()
+    k = k.replace(" ", "_")
+    k = k.replace("-", "_")
+    # specific synonyms
+    mapping = {
+        "order_id": "order_id",
+        "product": "product",
+        "category": "category",
+        "return_reason": "return_reason",
+        "reason": "return_reason",
+        "cost": "cost",
+        "price": "cost",
+        "approved": "approved_flag",
+        "approved_flag": "approved_flag",
+        "store": "store_name",
+        "store_name": "store_name",
+        "date": "date",
+    }
+    return mapping.get(k, k)
+
+#One more function for a record parsing from the user input
+def _parse_records(data: str) -> List[Dict[str, str]]:
+    records: List[Dict[str, str]] = []
+
+    #If we see ", " and multiple ":" in a single line it treats treat as format B
+    lines = [ln for ln in data.splitlines() if ln.strip()]
+    looks_like_b = any(ln.count(":") >= 2 and ", " in ln for ln in lines)
+
+    if looks_like_b:
+        for ln in lines:
+            row: Dict[str, str] = {}
+            for part in ln.split(","):
+                if ":" in part:
+                    k, v = part.split(":", 1)
+                    row[_norm_key(k)] = v.strip()
+            if row:
+                records.append(row)
+    else:
+        # format A
+        chunks = re.split(r"\n\s*\n", data.strip())
+        for chunk in chunks:
+            row: Dict[str, str] = {}
+            for ln in chunk.splitlines():
+                if ":" in ln:
+                    k, v = ln.split(":", 1)
+                    row[_norm_key(k)] = v.strip()
+            if row:
+                records.append(row)
+
+    return records
+
 
 #Creating the agent tool to generate the report
 @tool
@@ -24,18 +105,8 @@ async def generate_excel_report(data: str) -> str:
     """Generates an Excel report with Summary and Findings from the provided return orders data string."""
     try:
         # Parse the data string assuming format from retrieve_data: newline-separated key-value pairs, chunks are separated by \n\n)
-        rows = []
-        current_row = {}
-        for chunk in data.split('\n\n'):
-            for line in chunk.split('\n'):
-                if line.strip() and ': ' in line:
-                    key, value = line.split(': ', 1)
-                    current_row[key.strip()] = value.strip()
-            if current_row:
-                rows.append(current_row)
-                current_row = {}
-        if current_row:
-            rows.append(current_row)
+        raw = data if isinstance(data, str) else _to_text(data)
+        rows = _parse_records(raw)
 
         if not rows:
             return "Error: No valid data provided to generate report."
@@ -44,7 +115,10 @@ async def generate_excel_report(data: str) -> str:
         # Ensure numeric columns
         if 'cost' in dataFrame.columns:
             dataFrame['cost'] = pandas.to_numeric(dataFrame['cost'], errors='coerce')
-
+        for col in ("approved_flag", "product", "category", "return_reason", "store_name"):
+            if col in dataFrame.columns:
+                dataFrame[col] = dataFrame[col].astype(str)
+            
         #Formating the summary of all the data in the dataframe
         summary = {
             'Total Returns': len(dataFrame),
@@ -57,21 +131,36 @@ async def generate_excel_report(data: str) -> str:
         }
 
         #Now I use LLM to generate findings based on the summary provided
-        llm = ChatOpenAI(model="gpt-4.1-mini")
+        llm = ChatOpenAI(model="gpt-5-mini", reasoning={"effort": "minimal"})
         findings_prompt = (
             "Analyze the following summary of customer return orders and generate 5-10 key findings or insights. "
             "Focus on trends, common issues, potential business impacts, and recommendations. "
             f"Summary: {summary}"
         )
         findings_response = await llm.ainvoke(findings_prompt)
-        findings = findings_response.content
+        findings_text = _to_text(findings_response.content)
+        findings_lines = [ln.strip() for ln in findings_text.splitlines() if ln.strip()]
+        # findings = findings_response.content
+
 
         #Creating the excel file containing three sheets Raw Data, Summary and Findings
-        file_path = f"return_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        stem = f"return_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        filename = f"{stem}.xlsx"
+        file_path = REPORTS_DIR / filename
         with pandas.ExcelWriter(file_path, engine='openpyxl') as writer:
             dataFrame.to_excel(writer, sheet_name='Raw Data', index=False)
             pandas.DataFrame.from_dict(summary, orient='index', columns=['Value']).to_excel(writer, sheet_name='Summary')
-            pandas.DataFrame({"Findings": findings.split('\n')}).to_excel(writer, sheet_name='Findings', index=False)
+            pandas.DataFrame({"Findings": findings_lines}).to_excel(writer, sheet_name='Findings', index=False)
+        
+        url_files = f"{PUBLIC_BASE_URL}/files/{filename}"
+        url_download = f"{PUBLIC_BASE_URL}/download/{filename}"
+
+        return (
+            f"Excel report generated.\n\n"
+            f"- Direct link: {url_files}\n"
+            f"- Force download: {url_download}\n"
+        )
 
         return f"Excel report generated successfully at {file_path}"
     except Exception as e:
@@ -82,14 +171,16 @@ async def run_rep_ag(query: str, session_id: str = "default_session") -> str:
 
     #Now initializing connection with db, that will be used to store checkpoints to keep conversation memory
 
-    async_conn = await aiosqlite.connect("checkpoints_rep_ag.db")
+    async_conn = await aiosqlite.connect("checkpoints_agent.db")
     checkpointer = AsyncSqliteSaver(async_conn)
 
     #Now initializing LLM model that will be used for our agent
-    llm = ChatOpenAI(model="gpt-4.1")
+    llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.1)
 
     system_message = """
-    You are a report generation agent for customer return orders. Analyze the provided data in the user query and use the 'generate_excel_report' tool to create an Excel report with Summary and Findings. Extract the data from the query and pass it directly to the tool.
+    You are a report generation agent for customer return orders. 
+    Analyze the provided data in the user query and use the 'generate_excel_report' tool to create an Excel report with Summary and Findings. 
+    Extract the data from the query and pass it directly to the tool.
     """
 
     #Configuring the system prompt for our agent
@@ -136,10 +227,32 @@ app = FastAPI(
     title="Report Agent"
 )
 
+@app.get("/download/{filename}") #Endpoint to download the generated by the agnet report
+async def download_file(filename: str):
+    fullpath = REPORTS_DIR / filename
+    if not fullpath.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(
+        path=str(fullpath),
+        filename=filename,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 @app.get("/ping")
 async def ping():
     return {
         "status": "ok",
     }
 
-app.mount("/", mcp.sse_app())
+app.mount("/", mcp.sse_app()) #mounting mcp app 
+
+app.mount("/files", StaticFiles(directory=str(REPORTS_DIR), html=False), name="files")
+
+
+app.add_middleware( #adding allowence for url clicking in browser
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

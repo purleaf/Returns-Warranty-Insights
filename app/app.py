@@ -362,7 +362,7 @@ def index():
     </head>
     <body>
         <div class="header">
-            <h1>Returns and Warranty Insights Agent by Vincent Carter</h1>
+            <h1>Vincent Carter</h1>
             <button class="settings-btn" onclick="toggleSettings()">⚙️ Settings</button>
             <div class="settings-panel" id="settingsPanel">
                 <label for="model">Model:</label>
@@ -376,7 +376,7 @@ def index():
         <div class="chat-container">
             <div class="messages" id="messages">
                 <div class="welcome-message">
-                    <h2>Welcome to Returns and Warranty Insights Agent by Vincent Carter</h2>
+                    <h2>Welcome to Warranty Agent</h2>
                     <p>Ask me anything and I'll help you with detailed responses.</p>
                 </div>
             </div>

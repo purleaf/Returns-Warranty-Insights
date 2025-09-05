@@ -1,6 +1,13 @@
 from flask import Flask, request
+from dotenv import load_dotenv
+import os
+
 
 import requests
+
+load_dotenv()
+
+MAIN_AG_URL = os.getenv("MAIN_AG_URL")
 
 app = Flask(__name__)
 
@@ -552,7 +559,7 @@ def index():
 @app.route('/proxy_run_agent', methods=['POST'])
 def proxy_run_agent():
     # Forward the query params to the internal API URL
-    api_url = f"http://main-ag:8000/run_agent?{request.query_string.decode()}"
+    api_url = f"{MAIN_AG_URL}/run_agent?{request.query_string.decode()}"
     try:
         response = requests.post(api_url)
         return response.text, response.status_code

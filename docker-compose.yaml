@@ -17,8 +17,6 @@ services:
     build:
       context: .
       dockerfile: RagAg.Dockerfile
-    ports:
-      - "8001:8001"
     networks:
       - agent-network
 
@@ -26,8 +24,6 @@ services:
     build:
       context: .
       dockerfile: RepAg.Dockerfile
-    ports:
-      - "8002:8002"
     networks:
       - agent-network
     environment:

@@ -284,10 +284,43 @@ def index():
                 margin-left: 2rem;
                 color: #666;
                 font-style: italic;
+                font-size: 0.875rem;
+                align-items: center;
             }
             
             .typing-indicator.show {
-                display: block;
+                display: flex;
+            }
+            
+            .typing-dots {
+                display: inline-flex;
+                margin-left: 0.25rem;
+            }
+            
+            .dot {
+                width: 6px;
+                height: 6px;
+                background-color: #666;
+                border-radius: 50%;
+                margin: 0 2px;
+                animation: bounce 1.2s infinite ease-in-out;
+            }
+            
+            .dot:nth-child(2) {
+                animation-delay: -0.4s;
+            }
+            
+            .dot:nth-child(3) {
+                animation-delay: -0.8s;
+            }
+            
+            @keyframes bounce {
+                0%, 80%, 100% {
+                    transform: scale(0);
+                }
+                40% {
+                    transform: scale(1);
+                }
             }
             
             .welcome-message {
@@ -342,7 +375,12 @@ def index():
             </div>
             
             <div class="typing-indicator" id="typingIndicator">
-                AI is thinking...
+                AI is thinking
+                <div class="typing-dots">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                </div>
             </div>
             
             <div class="input-area">

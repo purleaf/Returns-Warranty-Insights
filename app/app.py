@@ -376,7 +376,7 @@ def index():
         <div class="chat-container">
             <div class="messages" id="messages">
                 <div class="welcome-message">
-                    <h2>Welcome to AI Agent</h2>
+                    <h2>Welcome to Returns and Warranty Insights Agent by Vincent Carter</h2>
                     <p>Ask me anything and I'll help you with detailed responses.</p>
                 </div>
             </div>

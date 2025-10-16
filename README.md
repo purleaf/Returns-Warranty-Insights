@@ -1,12 +1,3 @@
-## Live Demo
-Test the agent: 
-https://ui-28829503485.asia-east1.run.app/  (deployed with Google Cloud)
-
-Before start: 
-- Click on the settings button in the top right corner to set
-    - Model (`gpt-4o`, `gpt-4o-mini`, `gpt-4.1`, `gpt-4.1-mini`)
-    - Session name
-
 ## Test Locally
 ### 1. Set env file
 ```
